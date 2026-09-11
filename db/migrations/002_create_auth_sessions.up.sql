@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS sessions(
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    session varchar(255) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
