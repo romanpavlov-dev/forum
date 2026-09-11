@@ -14,12 +14,14 @@
             <a href="/">Home</a>
             <a href="/login">Login</a>
             <a href="/register">Register</a>
+            <button id="logoutBtn" type="button">Logout</button>
         </nav>
     </header>
 
     <main>
         <h2>Welcome to the forum</h2>
         <p>This is a placeholder page. Content goes here.</p>
+        <p id="logoutMsg"></p>
     </main>
 
     <footer>
@@ -27,5 +29,32 @@
     </footer>
 
     <script src="/static/js/main.js"></script>
+    <script>
+        const logoutBtn = document.getElementById('logoutBtn');
+        const logoutMsg = document.getElementById('logoutMsg');
+
+        logoutBtn.addEventListener('click', async () => {
+            logoutBtn.disabled = true;
+            logoutMsg.textContent = '';
+
+            try {
+                const res = await fetch('/logout', {
+                    method: 'POST',
+                    credentials: 'include' // обязательно — иначе cookie refresh_token не уйдёт на сервер
+                });
+
+                if (res.ok) {
+                    window.location.href = '/login';
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    logoutMsg.textContent = data.message || 'Не удалось выйти.';
+                    logoutBtn.disabled = false;
+                }
+            } catch (err) {
+                logoutMsg.textContent = 'Ошибка сети. Попробуйте позже.';
+                logoutBtn.disabled = false;
+            }
+        });
+    </script>
 </body>
 </html>
