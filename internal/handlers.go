@@ -6,13 +6,19 @@ import (
 	"fmt"
 	"forum/internal/auth"
 	"forum/internal/models"
+	"forum/internal/post_actions"
 	"log"
 	"net/http"
+	"strconv"
 	"text/template"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
+
+type contextKey string
+
+const userIDKey contextKey = "userID"
 
 type Handler struct {
 	conn *pgx.Conn
@@ -161,9 +167,7 @@ func (h *Handler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	old_refresh_token_hash := auth.HashToken(cookie.Value)
-
-	userID, valid := auth.ValidateRefreshToken(r.Context(), h.conn, old_refresh_token_hash)
+	userID, valid := auth.ValidateToken(r.Context(), h.conn, cookie.Value, "refresh")
 
 	if !valid {
 		writeJSONError(w, "invalid or expired refresh token", http.StatusUnauthorized)
@@ -183,7 +187,7 @@ func (h *Handler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	new_refresh_token_hash := auth.HashToken(new_refresh_token)
-
+	old_refresh_token_hash := auth.HashToken(cookie.Value)
 	if !auth.UpdateTokens(r.Context(), h.conn, userID, new_access_token_hash, new_refresh_token_hash, old_refresh_token_hash) {
 		writeJSONError(w, "cant update access token", http.StatusInternalServerError)
 		return
@@ -254,13 +258,77 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		userID, valid := auth.ValidateAccessToken(r.Context(), h.conn, auth.HashToken(cookie.Value))
+		userID, valid := auth.ValidateToken(r.Context(), h.conn, cookie.Value, "access")
 		if !valid {
-			writeJSONError(w, "token expired", http.StatusUnauthorized)
+			writeJSONError(w, "invalid or expired access token", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+func (h *Handler) HandleCreatePost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID, ok := r.Context().Value(userIDKey).(int)
+	if !ok {
+		writeJSONError(w, "User id not found", http.StatusUnauthorized)
+		return
+	}
+
+	var post models.PostRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
+		writeJSONError(w, "Failed to decode the input", http.StatusBadRequest)
+		return
+	}
+
+	if err := post_actions.InsertPost(r.Context(), h.conn, userID, post); err != nil {
+		writeJSONError(w, "Failed to insert post to a DB", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+
+}
+
+func (h *Handler) HandleEditPost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+
+	postID, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeJSONError(w, "Cant find parse post id", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := r.Context().Value(userIDKey).(int)
+	if !ok {
+		writeJSONError(w, "User id not found", http.StatusUnauthorized)
+		return
+	}
+
+	var post models.PostRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
+		writeJSONError(w, "Failed to decode the input", http.StatusBadRequest)
+		return
+	}
+
+	if err := post_actions.EditPost(r.Context(), h.conn, userID, postID, post); err != nil {
+		writeJSONError(w, "Cant update table", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
 }
