@@ -48,6 +48,8 @@ func main() {
 	http.HandleFunc("/logout", handler.Middleware(handler.HandleLogout))
 	http.HandleFunc("/", internal.MainHandler)
 	http.HandleFunc("/refresh", handler.HandleRefresh)
+	http.HandleFunc("/post", handler.Middleware(handler.HandleCreatePost))
+	http.HandleFunc("/post/{id}", handler.Middleware(handler.HandleEditPost))
 
 	log.Fatal(http.ListenAndServe(":9090", nil))
 }
