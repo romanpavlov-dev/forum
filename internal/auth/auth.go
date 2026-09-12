@@ -33,6 +33,7 @@ func RegisterUser(ctx context.Context, conn *pgx.Conn, user models.RegisterReque
 	hash, err := PasswordHash(user.Password)
 	if err != nil {
 		log.Println(err)
+		return pgconn.CommandTag{}, errors.New("Cant hash password")
 	}
 	return conn.Exec(ctx, query, user.Username, user.Email, hash, time.Now())
 
@@ -54,7 +55,7 @@ func AuthenticateUser(ctx context.Context, conn *pgx.Conn, user models.LoginRequ
 	}
 
 	if !VerifyPassword(user.Password, hash) {
-		log.Println("Unauthorized")
+		log.Println("Unauthorized: Wrong password")
 		return 0, false
 	}
 
@@ -103,25 +104,6 @@ func InsertSession(ctx context.Context, conn *pgx.Conn, userID int, access strin
 	`
 	_, err := conn.Exec(ctx, query, userID, access, time.Now().Add(15*time.Minute), refresh, time.Now().Add(14*24*time.Hour))
 	return err
-}
-
-func ValidateRefreshToken(ctx context.Context, conn *pgx.Conn, token string) (int, bool) {
-	query := `
-	SELECT user_id, refresh_expires_at
-	FROM sessions
-	WHERE refresh_token_hash = $1`
-	var refresh_expiration time.Time
-	var userID int
-	if err := conn.QueryRow(ctx, query, token).Scan(&userID, &refresh_expiration); err != nil {
-		log.Println(err)
-		return 0, false
-	}
-
-	if refresh_expiration.Before(time.Now()) {
-		return 0, false
-	}
-
-	return userID, true
 }
 
 func UpdateTokens(ctx context.Context, conn *pgx.Conn, userID int, access_hash string, new_refresh_token_hash string, old_refresh_token_hash string) bool {
@@ -182,36 +164,30 @@ func DeleteSession(ctx context.Context, conn *pgx.Conn, refresh_hash string) err
 	return nil
 }
 
-func ValidateAccessToken(ctx context.Context, conn *pgx.Conn, access_hash string) (int, bool) {
-	query := `
-	SELECT user_id, access_expires_at
+func ValidateToken(ctx context.Context, conn *pgx.Conn, token string, token_type string) (int, bool) {
+
+	var query string
+	switch token_type {
+	case "access":
+		query = `
+	SELECT user_id
 	FROM sessions
-	WHERE access_token_hash = $1`
-	var userID int
-	var access_expiration time.Time
-	if err := conn.QueryRow(ctx, query, access_hash).Scan(&userID, &access_expiration); err != nil {
-		log.Println(err)
+	WHERE access_token_hash = $1 AND access_expires_at > $2`
+	case "refresh":
+		query = `
+	SELECT user_id
+	FROM sessions
+	WHERE refresh_token_hash = $1 AND refresh_expires_at > $2`
+	default:
 		return 0, false
 	}
 
-	if access_expiration.Before(time.Now()) {
+	token_hash := HashToken(token)
+	var userID int
+	if err := conn.QueryRow(ctx, query, token_hash, time.Now()).Scan(&userID); err != nil {
+		log.Println(err)
 		return 0, false
 	}
 
 	return userID, true
 }
-
-// func ValidateAccessToken(ctx context.Context, conn *pgx.Conn, access_hash string) (int, bool) {
-// 	query := `
-// 	SELECT user_id
-// 	FROM sessions
-// 	WHERE access_token_hash = $1 AND access_expires_at > $2
-// 	`
-// 	var userID int
-// 	if err := conn.QueryRow(ctx, query, access_hash, time.Now()).Scan(&userID); err != nil {
-// 		log.Println(err)
-// 		return 0, false
-// 	}
-
-// 	return userID, true
-// }
