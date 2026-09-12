@@ -46,7 +46,7 @@ func (h *Handler) HandleEditPost(w http.ResponseWriter, r *http.Request) {
 
 	postID, err := strconv.Atoi(idStr)
 	if err != nil {
-		writeJSONError(w, "Cant find parse post id", http.StatusInternalServerError)
+		writeJSONError(w, "Cant parse post id", http.StatusInternalServerError)
 		return
 	}
 
@@ -70,4 +70,69 @@ func (h *Handler) HandleEditPost(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
+}
+
+func (h *Handler) HandleDeletePost(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(userIDKey).(int)
+	if !ok {
+		writeJSONError(w, "User id not found", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodDelete {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+	postID, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeJSONError(w, "Cant parse post id", http.StatusInternalServerError)
+		return
+	}
+
+	if err := post_actions.DeletePost(r.Context(), h.conn, userID, postID); err != nil {
+		writeJSONError(w, "Cant delete the post", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) HandleGetPost(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+
+	postID, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeJSONError(w, "Cant parse post id", http.StatusBadRequest)
+		return
+	}
+
+	post, err := post_actions.GetPost(r.Context(), h.conn, postID)
+	if err != nil {
+		writeJSONError(w, "Cant get post", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, post)
+}
+
+func (h *Handler) HandleGetAllPosts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	posts, err := post_actions.GetAllPosts(r.Context(), h.conn)
+	if err != nil {
+		writeJSONError(w, "Cant get posts", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, posts)
 }
