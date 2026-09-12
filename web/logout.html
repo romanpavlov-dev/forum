@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Вход</title>
+<title>Выход</title>
 
 <style>
   :root {
@@ -148,55 +148,35 @@
 <body>
 <div class="card">
 
-  <h1>Войти</h1>
-  <form id="form">
-    <div class="field">
-      <label for="email">Email</label>
-      <input type="email" id="email" required>
-    </div>
-    <div class="field">
-      <label for="password">Пароль</label>
-      <input type="password" id="password" required>
-    </div>
-    <button type="submit" id="btn">Войти</button>
-    <div class="msg" id="msg"></div>
-  </form>
+  <h1>Выйти из аккаунта</h1>
+  <button class="danger" id="btn">Выйти</button>
+  <div class="msg" id="msg"></div>
 
 </div>
 <script>
 
-const form = document.getElementById('form');
 const btn = document.getElementById('btn');
 const msg = document.getElementById('msg');
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  msg.textContent = '';
-  msg.className = 'msg';
-
+btn.addEventListener('click', async () => {
   try {
-    const res = await fetch('/login', {
+    const res = await fetch('/logout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        email: document.getElementById('email').value,
-        password: document.getElementById('password').value
-      })
+      credentials: 'include'
     });
 
     const data = await res.json().catch(() => ({}));
 
     if (res.ok) {
-      msg.textContent = 'Вход выполнен.';
-      msg.classList.add('success');
+      msg.textContent = 'Вы вышли из аккаунта.';
+      msg.className = 'msg success';
     } else {
-      msg.textContent = data.message || data.error || 'Неверный email или пароль.';
-      msg.classList.add('error');
+      msg.textContent = data.message || data.error || 'Не удалось выйти.';
+      msg.className = 'msg error';
     }
   } catch {
     msg.textContent = 'Ошибка сети.';
-    msg.classList.add('error');
+    msg.className = 'msg error';
   }
 });
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Вход</title>
+<title>Обновить токен</title>
 
 <style>
   :root {
@@ -148,50 +148,37 @@
 <body>
 <div class="card">
 
-  <h1>Войти</h1>
-  <form id="form">
-    <div class="field">
-      <label for="email">Email</label>
-      <input type="email" id="email" required>
-    </div>
-    <div class="field">
-      <label for="password">Пароль</label>
-      <input type="password" id="password" required>
-    </div>
-    <button type="submit" id="btn">Войти</button>
-    <div class="msg" id="msg"></div>
-  </form>
+  <h1>Обновить access token</h1>
+  <button id="btn">Refresh</button>
+  <div class="msg" id="msg"></div>
+  <div class="result" id="result" hidden></div>
 
 </div>
 <script>
 
-const form = document.getElementById('form');
 const btn = document.getElementById('btn');
 const msg = document.getElementById('msg');
+const result = document.getElementById('result');
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+btn.addEventListener('click', async () => {
   msg.textContent = '';
   msg.className = 'msg';
 
   try {
-    const res = await fetch('/login', {
+    const res = await fetch('/refresh', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        email: document.getElementById('email').value,
-        password: document.getElementById('password').value
-      })
+      credentials: 'include'
     });
 
     const data = await res.json().catch(() => ({}));
 
     if (res.ok) {
-      msg.textContent = 'Вход выполнен.';
+      msg.textContent = 'Access token обновлён.';
       msg.classList.add('success');
+      result.hidden = false;
+      result.textContent = JSON.stringify(data, null, 2);
     } else {
-      msg.textContent = data.message || data.error || 'Неверный email или пароль.';
+      msg.textContent = data.message || data.error || 'Не удалось обновить токен.';
       msg.classList.add('error');
     }
   } catch {
