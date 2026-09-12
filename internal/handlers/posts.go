@@ -1,0 +1,73 @@
+package handlers
+
+import (
+	"encoding/json"
+	"forum/internal/models"
+	"forum/internal/post_actions"
+	"net/http"
+	"strconv"
+)
+
+func (h *Handler) HandleCreatePost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID, ok := r.Context().Value(userIDKey).(int)
+	if !ok {
+		writeJSONError(w, "User id not found", http.StatusUnauthorized)
+		return
+	}
+
+	var post models.PostRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
+		writeJSONError(w, "Failed to decode the input", http.StatusBadRequest)
+		return
+	}
+
+	if err := post_actions.InsertPost(r.Context(), h.conn, userID, post); err != nil {
+		writeJSONError(w, "Failed to insert post to a DB", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+
+}
+
+func (h *Handler) HandleEditPost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		writeJSONError(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+
+	postID, err := strconv.Atoi(idStr)
+	if err != nil {
+		writeJSONError(w, "Cant find parse post id", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := r.Context().Value(userIDKey).(int)
+	if !ok {
+		writeJSONError(w, "User id not found", http.StatusUnauthorized)
+		return
+	}
+
+	var post models.PostRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
+		writeJSONError(w, "Failed to decode the input", http.StatusBadRequest)
+		return
+	}
+
+	if err := post_actions.EditPost(r.Context(), h.conn, userID, postID, post); err != nil {
+		writeJSONError(w, "Cant update table", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+}
