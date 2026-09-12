@@ -33,6 +33,7 @@ func writeJSONError(w http.ResponseWriter, message string, status int) {
 func MainHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		log.Println("Forbidden Method")
+		writeJSONError(w, "Method is not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -67,7 +68,7 @@ func (h *Handler) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 		var user models.RegisterRequest
 
 		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-			writeJSONError(w, "Failed to decode the input", http.StatusInternalServerError)
+			writeJSONError(w, "Failed to decode the input", http.StatusBadRequest)
 			return
 		}
 
@@ -103,13 +104,13 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var user models.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-			writeJSONError(w, "cant decode json", http.StatusInternalServerError)
+			writeJSONError(w, "cant decode json", http.StatusBadRequest)
 			return
 		}
 
 		userid, valid := auth.AuthenticateUser(r.Context(), h.conn, user)
 		if !valid {
-			writeJSONError(w, "Wrong password", http.StatusBadRequest)
+			writeJSONError(w, "Wrong credentials", http.StatusUnauthorized)
 			return
 		}
 		//create session
@@ -123,9 +124,9 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, "cant gen refresh token", http.StatusInternalServerError)
 			return
 		}
-		access_hash := auth.HashToken(access) //err propagation
+		access_hash := auth.HashToken(access)
 
-		refresh_hash := auth.HashToken(refresh) //may be add err propagation? later
+		refresh_hash := auth.HashToken(refresh)
 
 		if err := auth.InsertSession(r.Context(), h.conn, userid, access_hash, refresh_hash); err != nil {
 			writeJSONError(w, "cant insert session", http.StatusInternalServerError)
@@ -169,10 +170,18 @@ func (h *Handler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	new_access_token, _ := auth.GenerateToken()
-	new_access_token_hash := auth.HashToken(new_access_token) //err propagation
+	new_access_token, err := auth.GenerateToken()
+	if err != nil {
+		writeJSONError(w, "cant gen new access token", http.StatusInternalServerError)
+		return
+	}
+	new_access_token_hash := auth.HashToken(new_access_token)
 
 	new_refresh_token, err := auth.GenerateToken()
+	if err != nil {
+		writeJSONError(w, "cant gen new refresh token", http.StatusInternalServerError)
+		return
+	}
 	new_refresh_token_hash := auth.HashToken(new_refresh_token)
 
 	if !auth.UpdateTokens(r.Context(), h.conn, userID, new_access_token_hash, new_refresh_token_hash, old_refresh_token_hash) {
@@ -207,7 +216,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		writeJSONError(w, "No cookies", http.StatusUnauthorized)
+		writeJSONError(w, "Refresh token not available", http.StatusUnauthorized)
 		return
 	}
 
@@ -241,7 +250,7 @@ func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("access_token")
 		if err != nil {
-			writeJSONError(w, "No cookies", http.StatusUnauthorized)
+			writeJSONError(w, "Access token not available", http.StatusUnauthorized)
 			return
 		}
 
