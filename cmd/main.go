@@ -39,17 +39,39 @@ func main() {
 		log.Fatal(err) //cant run query
 	}
 
+	sql, err = os.ReadFile("db/migrations/003_create_posts.up.sql")
+	if err != nil {
+		log.Fatal(err) //cant read file
+
+	}
+
+	_, err = conn.Exec(ctx, string(sql))
+	if err != nil {
+		log.Fatal(err) //cant run query
+	}
+
 	handler := handlers.NewHandler(conn)
 
 	auth.StartSessionCleanup(conn)
 
-	http.HandleFunc("/register", handler.HandleRegistration)
-	http.HandleFunc("/login", handler.HandleLogin)
-	http.HandleFunc("/logout", handler.Middleware(handler.HandleLogout))
-	http.HandleFunc("/", handlers.MainHandler)
-	http.HandleFunc("/refresh", handler.HandleRefresh)
-	http.HandleFunc("/post", handler.Middleware(handler.HandleCreatePost))
-	http.HandleFunc("/post/{id}", handler.Middleware(handler.HandleEditPost))
+	mux := http.NewServeMux()
+	fileServer := http.FileServer(http.Dir("./web"))
+	mux.Handle("GET /", fileServer)
 
-	log.Fatal(http.ListenAndServe(":9090", nil))
+	mux.HandleFunc("POST /register", handler.HandleRegistration)
+	mux.HandleFunc("POST /login", handler.HandleLogin)
+	mux.HandleFunc("POST /refresh", handler.HandleRefresh)
+
+	mux.HandleFunc("POST /logout", handler.Middleware(handler.HandleLogout))
+
+	mux.HandleFunc("GET /posts", handler.HandleGetAllPosts)
+	mux.HandleFunc("GET /posts/{id}", handler.HandleGetPost)
+
+	mux.HandleFunc("POST /posts", handler.Middleware(handler.HandleCreatePost))
+
+	mux.HandleFunc("PATCH /posts/{id}", handler.Middleware(handler.HandleEditPost))
+
+	mux.HandleFunc("DELETE /posts/{id}", handler.Middleware(handler.HandleDeletePost))
+
+	log.Fatal(http.ListenAndServe(":9090", mux))
 }
