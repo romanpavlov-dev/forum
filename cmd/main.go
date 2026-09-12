@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"forum/db/connection"
-	"forum/internal"
 	"forum/internal/auth"
+	"forum/internal/handlers"
 	"log"
 	"net/http"
 	"os"
@@ -39,14 +39,14 @@ func main() {
 		log.Fatal(err) //cant run query
 	}
 
-	handler := internal.NewHandler(conn)
+	handler := handlers.NewHandler(conn)
 
 	auth.StartSessionCleanup(conn)
 
 	http.HandleFunc("/register", handler.HandleRegistration)
 	http.HandleFunc("/login", handler.HandleLogin)
 	http.HandleFunc("/logout", handler.Middleware(handler.HandleLogout))
-	http.HandleFunc("/", internal.MainHandler)
+	http.HandleFunc("/", handlers.MainHandler)
 	http.HandleFunc("/refresh", handler.HandleRefresh)
 	http.HandleFunc("/post", handler.Middleware(handler.HandleCreatePost))
 	http.HandleFunc("/post/{id}", handler.Middleware(handler.HandleEditPost))

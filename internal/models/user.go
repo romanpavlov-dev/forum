@@ -22,7 +22,4 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-type PostRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
+
